@@ -83,9 +83,46 @@ export async function POST(request: NextRequest) {
       checkExpiry(vehicle['National Expiry Date'], 'national');
     });
 
-    // Create email content
+    // Helper function to create document-specific tables
+    const createDocumentTable = (
+      documentName: string,
+      dateField: keyof VehicleData,
+      vehicles: VehicleData[]
+    ) => {
+      const filteredVehicles = vehicles.filter((vehicle) => {
+        const expiryDate = new Date(vehicle[dateField]);
+        return isWithinInterval(expiryDate, {
+          start: monthStart,
+          end: monthEnd,
+        });
+      });
+
+      if (filteredVehicles.length === 0) return '';
+
+      return `
+        <h4>${documentName} Expiring (${filteredVehicles.length})</h4>
+        <table border="1" style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
+          <tr style="background-color: #f2f2f2;">
+            <th style="padding: 8px;">Registration Number</th>
+            <th style="padding: 8px;">Expiry Date</th>
+          </tr>
+          ${filteredVehicles
+            .map(
+              (vehicle) => `
+              <tr>
+                <td style="padding: 8px;">${vehicle['Registration Number']}</td>
+                <td style="padding: 8px;">${vehicle[dateField]}</td>
+              </tr>
+            `
+            )
+            .join('')}
+        </table>
+      `;
+    };
+
+    // Create email content with separate tables
     const emailContent = `
-      <h2>Vehicle Document Expiry Report</h2>
+      <h2 style="color: #333;">Vehicle Document Expiry Report</h2>
       <h3>Summary for ${month}</h3>
       <ul>
         <li>Fitness Certificates Expiring: ${expiryCount.fitness}</li>
@@ -95,54 +132,28 @@ export async function POST(request: NextRequest) {
         <li>National Permits Expiring: ${expiryCount.national}</li>
       </ul>
       
-      <h3>Detailed Report</h3>
-      <table border="1" style="border-collapse: collapse; width: 100%;">
-        <tr>
-          <th>Registration Number</th>
-          <th>Document</th>
-          <th>Expiry Date</th>
-        </tr>
-        ${expiringVehicles
-          .map((vehicle) => {
-            const rows: string[] = [];
-            const documents: Document[] = [
-              {
-                name: 'Fitness Certificate',
-                date: vehicle['Fitness Expiry Date'],
-              },
-              { name: 'Insurance', date: vehicle['Insurance Expiry Date'] },
-              {
-                name: 'Pollution Certificate',
-                date: vehicle['Pollution Expiry Date'],
-              },
-              { name: 'Permit', date: vehicle['Permit Expiry Date'] },
-              {
-                name: 'National Permit',
-                date: vehicle['National Expiry Date'],
-              },
-            ];
-
-            documents.forEach((doc) => {
-              const expiryDate = new Date(doc.date);
-              if (
-                isWithinInterval(expiryDate, {
-                  start: monthStart,
-                  end: monthEnd,
-                })
-              ) {
-                rows.push(`
-                  <tr>
-                    <td>${vehicle['Registration Number']}</td>
-                    <td>${doc.name}</td>
-                    <td>${doc.date}</td>
-                  </tr>
-                `);
-              }
-            });
-            return rows.join('');
-          })
-          .join('')}
-      </table>
+      <h3 style="color: #333; margin-top: 30px;">Detailed Reports</h3>
+      ${createDocumentTable(
+        'Fitness Certificates',
+        'Fitness Expiry Date',
+        expiringVehicles
+      )}
+      ${createDocumentTable(
+        'Insurance Policies',
+        'Insurance Expiry Date',
+        expiringVehicles
+      )}
+      ${createDocumentTable(
+        'Pollution Certificates',
+        'Pollution Expiry Date',
+        expiringVehicles
+      )}
+      ${createDocumentTable('Permits', 'Permit Expiry Date', expiringVehicles)}
+      ${createDocumentTable(
+        'National Permits',
+        'National Expiry Date',
+        expiringVehicles
+      )}
     `;
 
     // Configure email transport with updated SSL settings
