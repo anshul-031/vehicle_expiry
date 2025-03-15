@@ -160,9 +160,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Send email
+    // Send email with configurable from address
     await transporter.sendMail({
-      from: process.env.SMTP_USER,
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: email,
       subject: `Vehicle Document Expiry Report - ${month}`,
       html: emailContent,
